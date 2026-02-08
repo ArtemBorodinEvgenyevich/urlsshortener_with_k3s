@@ -1,0 +1,358 @@
+.app {
+    min-height: 100vh;
+    width: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+}
+
+/* Wrapper for Pure CSS Grid */
+.app > .pure-g {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* center column */
+.center-container {
+    margin: 0 auto;
+    float: none !important;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 3rem;
+    animation: fadeInDown 0.6s ease-out;
+}
+
+.title {
+    font-size: 3rem;
+    font-weight: 800;
+    margin: 0 0 1rem 0;
+    color: #ffffff;
+    line-height: 1.2;
+}
+
+.gradient-text {
+    background: linear-gradient(135deg, #ffffff 0%, #e0e7ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.subtitle {
+    font-size: 1.25rem;
+    color: #e0e7ff;
+    margin: 0;
+    font-weight: 400;
+    line-height: 1.5;
+}
+
+.main {
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 2.5rem;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: fadeInUp 0.6s ease-out;
+    width: 100%;
+}
+
+.alert {
+    padding: 1rem 1.25rem;
+    border-radius: 12px;
+    margin-top: 1.5rem;
+    font-weight: 500;
+    text-align: center;
+}
+
+.alert-error {
+    background-color: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+}
+
+.result-card {
+    margin-top: 2rem;
+    padding: 2rem;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    border-radius: 16px;
+    border: 2px solid #bae6fd;
+    animation: slideIn 0.4s ease-out;
+}
+
+.result-title {
+    margin: 0 0 1.5rem 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0c4a6e;
+    text-align: center;
+}
+
+.url-display-grid {
+    margin-bottom: 1.5rem;
+    align-items: center;
+}
+
+.url-display-grid > div {
+    padding: 0.5rem;
+}
+
+.short-url {
+    display: block;
+    width: 100%;
+    padding: 1rem 1.25rem;
+    background: #ffffff;
+    border: 2px solid #3b82f6;
+    border-radius: 12px;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #3b82f6;
+    text-decoration: none;
+    word-break: break-all;
+    transition: all 0.3s ease;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.short-url:hover {
+    background: #eff6ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+.copy-button {
+    width: 100%;
+    padding: 1rem 1.5rem !important;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+    color: #ffffff !important;
+    border-radius: 12px !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease;
+    box-sizing: border-box;
+    position: relative;
+    overflow: hidden;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.copy-button:hover {
+    background: #2563eb !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.copy-button:active {
+    transform: translateY(0);
+}
+
+.copy-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+            90deg,
+            transparent,
+            rgba(255, 255, 255, 0.3),
+            transparent
+    );
+    transition: left 0.5s ease;
+}
+
+.copy-button:hover:not(.copied) {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.copy-button:active:not(.copied) {
+    transform: translateY(0);
+}
+
+/* Состояние "скопировано" */
+.copy-button.copied {
+    background: linear-gradient(
+            135deg,
+            #10b981 0%,
+            #059669 50%,
+            #047857 100%
+    ) !important;
+    animation: gradientShift 0.6s ease-in-out;
+    transform: scale(1.05);
+}
+
+.copy-button.copied::before {
+    left: 100%;
+}
+
+
+.original-url {
+    padding-top: 1.5rem;
+    border-top: 1px solid #bae6fd;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: center;
+}
+
+.label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #0c4a6e;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.url-text {
+    color: #475569;
+    word-break: break-all;
+    font-size: 0.95rem;
+}
+
+.footer {
+    text-align: center;
+    margin-top: 3rem;
+    color: #e0e7ff;
+    font-size: 0.95rem;
+}
+
+/* Animations */
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .app {
+        padding: 1.5rem 1rem;
+    }
+
+    .title {
+        font-size: 2.25rem;
+    }
+
+    .subtitle {
+        font-size: 1rem;
+    }
+
+    .main {
+        padding: 1.5rem;
+    }
+
+    .result-card {
+        padding: 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .app {
+        padding: 1rem 0.75rem;
+    }
+
+    .title {
+        font-size: 1.75rem;
+    }
+
+    .subtitle {
+        font-size: 0.9rem;
+    }
+
+    .main {
+        padding: 1.25rem;
+        border-radius: 16px;
+    }
+}
+
+/* Анимация градиента */
+@keyframes gradientShift {
+    0% {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+        transform: scale(1);
+    }
+    50% {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+        transform: scale(1.08);
+    }
+    100% {
+        background: linear-gradient(135deg, #10b981 0%, #047857 100%) !important;
+        transform: scale(1.05);
+    }
+}
+
+/* Иконка галочки */
+.checkmark {
+    display: inline-block;
+    animation: checkmarkPop 0.3s ease-out;
+    font-size: 1.2rem;
+}
+
+@keyframes checkmarkPop {
+    0% {
+        transform: scale(0) rotate(-45deg);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.2) rotate(0deg);
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+}
+
+/* Пульсация для copied состояния */
+.copy-button.copied {
+    animation: gradientShift 0.6s ease-in-out, pulse 0.6s ease-in-out;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    50% {
+        box-shadow: 0 8px 24px rgba(16, 185, 129, 0.5);
+    }
+}
+
+/* Spinner animation */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

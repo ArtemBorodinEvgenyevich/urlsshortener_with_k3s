@@ -1,0 +1,85 @@
+http:
+  middlewares:
+    auth-required:
+      forwardAuth:
+        address: "http://iam-service:9092/auth/validate"
+        authResponseHeaders:
+          - "X-User-Id"
+          - "X-Provider"
+
+  routers:
+    # Traefik Dashboard (separate entrypoint)
+    traefik-dashboard:
+      rule: "PathPrefix(`/`)"
+      service: api@internal
+      entryPoints:
+        - dashboard
+      priority: 100
+
+    # Health check endpoints (no auth)
+    api-health:
+      rule: "Path(`/api/v1/health`) || Path(`/api/v1/readiness`)"
+      service: urls-service
+      entryPoints:
+        - web
+      priority: 20
+
+    # User URLs list (requires auth to get X-User-Id)
+    api-user-urls:
+      rule: "Path(`/api/v1/urls`) && Method(`GET`)"
+      service: urls-service
+      middlewares:
+        - auth-required
+      entryPoints:
+        - web
+      priority: 12
+
+    # Public GET requests to API (no auth)
+    api-public:
+      rule: "PathPrefix(`/api`) && (Method(`GET`) || Method(`HEAD`) || Method(`OPTIONS`))"
+      service: urls-service
+      entryPoints:
+        - web
+      priority: 10
+
+    # Protected POST/DELETE requests (require auth)
+    api-protected:
+      rule: "PathPrefix(`/api`) && (Method(`POST`) || Method(`DELETE`) || Method(`PUT`) || Method(`PATCH`))"
+      service: urls-service
+      middlewares:
+        - auth-required
+      entryPoints:
+        - web
+      priority: 11
+
+    # IAM endpoints (public - handles its own auth)
+    iam:
+      rule: "PathPrefix(`/auth`) || PathPrefix(`/users`)"
+      service: iam-service
+      entryPoints:
+        - web
+      priority: 15
+
+    # Frontend (catch-all)
+    frontend:
+      rule: "PathPrefix(`/`)"
+      service: frontend
+      entryPoints:
+        - web
+      priority: 1
+
+  services:
+    frontend:
+      loadBalancer:
+        servers:
+          - url: "http://frontend:5173"
+
+    urls-service:
+      loadBalancer:
+        servers:
+          - url: "http://urls-service:9091"
+
+    iam-service:
+      loadBalancer:
+        servers:
+          - url: "http://iam-service:9092"

@@ -1,0 +1,305 @@
+version: '3'
+
+vars:
+  # VERSIONS
+  GO_VERSION: '1.25'
+  GOLANGCI_LINT_VERSION: 'v2.1.5'
+  GCI_VERSION: 'v0.13.6'
+  GOFUMPT_VERSION: 'v0.8.0'
+  GOOSE_VERSION: 'v3.26.0'
+
+  # BIN PATHS
+  BIN_DIR: '{{.ROOT_DIR}}/bin'
+  GOLANGCI_LINT: '{{.BIN_DIR}}/golangci-lint'
+  GCI: '{{.BIN_DIR}}/gci'
+  GOFUMPT: '{{.BIN_DIR}}/gofumpt'
+  GOOSE: '{{.BIN_DIR}}/goose'
+
+  # DOCKER
+  DOCKER_DIR: '{{.ROOT_DIR}}/docker'
+
+tasks:
+  # ====== LINTS & FORMATTERS ======
+  install-formatters:
+    desc: "Устанавливает форматтеры gci и gofumpt в ./bin"
+    summary: |
+      Эта задача проверяет наличие инструментов форматирования кода gofumpt и gci в директории bin.
+      Если инструменты не найдены, они будут автоматически установлены с указанными версиями.
+
+      Используется:
+        - gofumpt: для форматирования кода Go
+        - gci: для сортировки импортов Go
+    cmds:
+      - |
+        [ -f {{.GOFUMPT}} ] || {
+          echo '📦 Устанавливаем gofumpt {{.GOFUMPT_VERSION}}...'
+          GOBIN={{.BIN_DIR}} go install mvdan.cc/gofumpt@{{.GOFUMPT_VERSION}}
+        }
+        [ -f {{.GCI}} ] || {
+          echo '📦 Устанавливаем gci {{.GCI_VERSION}}...'
+          GOBIN={{.BIN_DIR}} go install github.com/daixiang0/gci@{{.GCI_VERSION}}
+        }
+    status:
+      - test -x {{.GOFUMPT}}
+      - test -x {{.GCI}}
+
+  install-golangci-lint:
+    desc: "Устанавливает golangci-lint в каталог bin"
+    summary: |
+      Проверяет наличие golangci-lint в директории bin.
+      Если инструмент не найден, автоматически устанавливает его через go install.
+
+      Устанавливаемая версия: {{.GOLANGCI_LINT_VERSION}}
+    cmds:
+      - |
+        [ -f {{.GOLANGCI_LINT}} ] || {
+          mkdir -p {{.BIN_DIR}}
+          echo "📦 Устанавливаем golangci-lint {{.GOLANGCI_LINT_VERSION}}..."
+          GOBIN={{.BIN_DIR}} go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
+        }
+    status:
+      - test -x {{.GOLANGCI_LINT}}
+
+  format:
+    desc: "Форматирует весь проект gofumpt + gci, исключая mocks"
+    summary: |
+      Форматирует все Go-файлы проекта с использованием gofumpt для стандартизации кода
+      и gci для сортировки импортов, исключая файлы в директориях mocks.
+
+      Использует инструменты:
+        - gofumpt: для стандартизации форматирования
+        - gci: для сортировки импортов по стандартным группам
+    deps: [ install-formatters ]
+    cmds:
+      - |
+        echo "🧼 Форматируем через gofumpt ..."
+
+        for module in {{.MODULES}}; do
+          if [ -d "$module" ]; then
+            echo "🧼 Форматируем $module"
+            find $module -type f -name '*.go' ! -path '*/mocks/*' -exec {{.GOFUMPT}} -extra -w {} +
+          fi
+        done
+      - |
+        echo "🎯 Сортируем импорты через gci ..."
+
+        for module in {{.MODULES}}; do
+          if [ -d "$module" ]; then
+            echo "🎯 Сортируем импорты в $module"
+            find $module -type f -name '*.go' ! -path '*/mocks/*' -exec {{.GCI}} write -s standard -s default -s "prefix(github.com/olezhek28/microservices-course-olezhek-solution)" {} +
+          fi
+        done
+
+
+  lint:
+    desc: "Запускает golangci-lint для всех модулей"
+    summary: |
+      Запускает линтер golangci-lint для всех модулей проекта.
+      Линтер проверяет код на соответствие стандартам качества и лучшим практикам.
+      Проверка включает проверку безопасности через gosec (встроенный в golangci-lint).
+
+      Зависимости:
+        - install-golangci-lint: автоматически устанавливает линтер
+        - format: форматирует код перед проверкой
+    deps: [ install-golangci-lint ]
+    vars:
+      MODULES: '{{.MODULES}}'
+      GOLANGCI_LINT: '{{.GOLANGCI_LINT}}'
+    cmds:
+      - |
+        set -e
+        ERR=0
+        echo "🔍 Линтим все модули ..."
+        for mod in {{.MODULES}}; do
+          if [ -d "$mod" ]; then
+            echo "🔍 Линтим $mod module"
+            {{.GOLANGCI_LINT}} run $mod/... --config=.golangci.yml || ERR=1
+          fi
+        done
+        exit $ERR
+
+
+  # ====== MIGRATIONS ======
+  install-migration-tools:
+    desc: ""
+    summary: ""
+    cmds:
+      - |
+        [ -f {{.GOOSE}} ] || {
+          echo '📦 Устанавливаем goose {{.GOOSE_VERSION}}...'
+          GOBIN={{.BIN_DIR}} go install github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}}
+        }
+    status:
+      - test -x {{.GOOSE}}
+
+  goose:create-psql:
+    desc: ""
+    summary: ""
+    deps: [ install-migration-tools ]
+    requires:
+      vars: [ NAME ]
+    cmds:
+      - |
+        {
+          echo "📝 Создаем миграцию {{.NAME}}..."
+          {{.GOOSE}} -dir db/migrations create "{{.NAME}}" sql
+        }
+
+  goose:up:
+    desc: ""
+    summary: ""
+    deps: [ install-migration-tools ]
+    dotenv: ['docker/.env']
+    cmds:
+      - |
+        {{.GOOSE}} -dir db/migrations up
+
+
+  goose:down:
+    desc: "Откатывает последнюю миграцию"
+    summary: |
+      Откатывает последнюю применённую миграцию.
+    deps: [ install-migration-tools ]
+    dotenv: ['docker/.env']
+    cmds:
+      - |
+        {{.GOOSE}} -dir db/migrations down
+
+
+  goose:status:
+    desc: "Показывает статус миграций"
+    summary: |
+      Показывает какие миграции применены, а какие нет.
+    deps: [ install-migration-tools ]
+    dotenv: ['docker/.env']
+    cmds:
+      - |
+        {{.GOOSE}} -dir db/migrations status
+
+
+  # ====== BENCHMARKING & TESTING ======
+  hey:download:
+    desc: "Get hey tool"
+    summary: "Downloads hey - http server benchmarking tool (alternative for Apache ab)"
+    cmds:
+      - |
+        wget https://hey-release.s3.us-east-2.amazonaws.com/hey_linux_amd64
+      
+
+  # ====== DOCKER TASKS ======
+  docker-up:
+    desc: "Запускает контейнеры в background режиме"
+    summary: ""
+    dir: "{{.DOCKER_DIR}}"
+    cmds:
+      - docker-compose up -d
+
+  docker-up-foreground:
+    desc: "Запускает контейнеры в foreground режиме (dev env)"
+    summary: |
+      Запускает контейнеры в foreground режиме.
+      При Ctrl+C корректно останавливает все контейнеры.
+      Используется для локальной разработки.
+    dir: "{{.DOCKER_DIR}}"
+    cmds:
+      - docker-compose up --build
+
+  docker-down:
+    desc: "Останавливает контейнеры"
+    summary: ""
+    dir: "{{.DOCKER_DIR}}"
+    cmds:
+      - docker-compose down
+
+  docker-down-volumes:
+    desc: "Останавливает контейнеры и удаляет volumes"
+    summary: ""
+    dir: "{{.DOCKER_DIR}}"
+    cmds:
+      - docker-compose down -v
+
+  docker-build:
+    desc: "Пересобирает образы"
+    summary: ""
+    dir: "{{.DOCKER_DIR}}"
+    cmds:
+      - docker-compose build --no-cache
+
+  docker-rebuild:
+    desc: "Пересобирает и запускает в background"
+    summary: ""
+    dir: "{{.DOCKER_DIR}}"
+    cmds:
+      - docker-compose down
+      - docker-compose up --build -d
+
+  docker-logs:
+    desc: "Показывает логи всех сервисов"
+    summary: |
+      Выводит логи всех сервисов в режиме реального времени.
+      Для выхода нажмите Ctrl+C.
+    dir: '{{.DOCKER_DIR}}'
+    cmds:
+      - docker-compose logs -f
+
+  docker-logs-app:
+    desc: "Показывает логи приложения"
+    summary: |
+      Выводит только логи URL Shortener приложения.
+    dir: '{{.DOCKER_DIR}}'
+    cmds:
+      - docker-compose logs -f app
+
+  docker-logs-postgres:
+    desc: "Показывает логи PostgreSQL"
+    summary: |
+      Выводит только логи PostgreSQL базы данных.
+    dir: '{{.DOCKER_DIR}}'
+    cmds:
+      - docker-compose logs -f postgres
+
+  # ====== POSTGRESQL TASKS ======
+  psql:
+    desc: "Открывает psql в PostgreSQL"
+    dir: '{{.DOCKER_DIR}}'
+    summary: |
+      Подключается к PostgreSQL через psql клиент.
+    cmds:
+      - docker exec -it urlshortener_postgres sh -c "psql -U urlshortener -d urlshortener"
+
+  # ====== APPLICATION TASKS ======
+  app:provision:
+    desc: "Запускает полное окружение для разработки"
+    summary: |
+      Выполняет полный цикл запуска для разработки:
+      1. Форматирует код
+      2. Останавливает старые контейнеры
+      3. Пересобирает и запускает новые
+      4. Показывает логи
+    cmds:
+      - task: format
+      - task: docker-down
+      - task: docker-up-foreground
+
+  app:provision:background:
+    desc: "Запускает окружение в background"
+    summary: |
+      Запускает сервисы в background режиме.
+      Для остановки используйте: task docker-down
+    cmds:
+      - task: format
+      - task: docker-rebuild
+
+  app:sh:
+    desc: "Открывает shell в контейнере приложения"
+    dir: '{{.DOCKER_DIR}}'
+    summary: |
+      Подключается к контейнеру приложения через shell.
+    cmds:
+      - docker exec -it urlshortener_app sh
+
+  app:restart:
+    desc: "Перезапускает только приложение"
+    dir: '{{.DOCKER_DIR}}'
+    cmds:
+      - docker-compose restart app

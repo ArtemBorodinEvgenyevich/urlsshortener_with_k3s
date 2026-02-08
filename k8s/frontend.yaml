@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: urls-frontend
+  namespace: urls
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: urls-frontend
+  template:
+    metadata:
+      labels:
+        app: urls-frontend
+    spec:
+      containers:
+        - name: urls-frontend
+          image: urls-frontend:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: urls-frontend
+  namespace: urls
+spec:
+  selector:
+    app: urls-frontend
+  ports:
+    - port: 80

@@ -1,0 +1,251 @@
+version: '3'
+
+vars:
+  APP_NAME: iam-service
+  DOCKER_IMAGE: urls_iam_service
+  MIGRATIONS_DIR: ./migrations
+  DB_HOST: localhost
+  DB_PORT: 5433
+  DB_USER: iam_user
+  DB_PASSWORD: iam_secure_password
+  DB_NAME: iam_db
+  DB_SSL_MODE: disable
+  DB_URL: "host={{.DB_HOST}} port={{.DB_PORT}} user={{.DB_USER}} password={{.DB_PASSWORD}} dbname={{.DB_NAME}} sslmode={{.DB_SSL_MODE}}"
+  BIN_DIR: '{{.ROOT_DIR}}/bin'
+  GOOSE: '{{.BIN_DIR}}/goose'
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  # Docker commands
+  docker:build:
+    desc: Build Docker image
+    cmds:
+      - echo "Building Docker image..."
+      - docker build -t {{.DOCKER_IMAGE}}:latest .
+
+  docker:up:
+    desc: Start Docker containers
+    cmds:
+      - echo "Starting Docker containers..."
+      - docker-compose up -d
+
+  docker:down:
+    desc: Stop Docker containers
+    cmds:
+      - echo "Stopping Docker containers..."
+      - docker-compose down
+
+  docker:logs:
+    desc: Show Docker logs
+    cmds:
+      - docker-compose logs -f iam-service
+
+  docker:restart:
+    desc: Restart Docker containers
+    deps: [docker:down, docker:up]
+
+  docker:clean:
+    desc: Clean Docker containers and volumes
+    deps: [docker:down]
+    cmds:
+      - echo "Cleaning Docker volumes..."
+      - docker-compose down -v
+      - docker system prune -f
+
+  docker:ps:
+    desc: Show running containers
+    cmds:
+      - docker-compose ps
+
+  # Migration commands
+  migrate:install:
+    desc: Install goose migration tool
+    cmds:
+      - echo "Installing goose..."
+      - go install github.com/pressly/goose/v3/cmd/goose@latest
+
+  migrate:up:
+    desc: Run database migrations
+    cmds:
+      - echo "Running migrations..."
+      - |
+        {{.GOOSE}} -dir {{.MIGRATIONS_DIR}} postgres "{{.DB_URL}}" up
+
+  migrate:down:
+    desc: Rollback last migration
+    cmds:
+      - echo "Rolling back migration..."
+      - |
+        {{.GOOSE}} -dir {{.MIGRATIONS_DIR}} postgres "{{.DB_URL}}" down
+
+  migrate:status:
+    desc: Show migration status
+    cmds:
+      - |
+        {{.GOOSE}} -dir {{.MIGRATIONS_DIR}} postgres "{{.DB_URL}}" status
+
+  migrate:create:
+    desc: "Create new migration (usage: task migrate:create NAME=create_new_table)"
+    cmds:
+      - |
+        {{.GOOSE}} -dir {{.MIGRATIONS_DIR}} create {{.NAME}} sql
+
+  migrate:reset:
+    desc: Reset database (rollback all migrations)
+    cmds:
+      - echo "Resetting database..."
+      - |
+        {{.GOOSE}} -dir {{.MIGRATIONS_DIR}} postgres "{{.DB_URL}}" reset
+
+  # Code quality
+  lint:
+    desc: Run linter
+    cmds:
+      - echo "Running linter..."
+      - golangci-lint run ./...
+
+  fmt:
+    desc: Format code
+    cmds:
+      - echo "Formatting code..."
+      - go fmt ./...
+      - goimports -w .
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - echo "Running go vet..."
+      - go vet ./...
+
+  check:
+    desc: Run all checks (fmt, vet, lint, test)
+    cmds:
+      - task: fmt
+      - task: vet
+      - task: lint
+      - task: test
+
+  # Dependencies
+  deps:
+    desc: Download dependencies
+    cmds:
+      - echo "Downloading dependencies..."
+      - go mod download
+
+  deps:update:
+    desc: Update dependencies
+    cmds:
+      - echo "Updating dependencies..."
+      - go get -u ./...
+      - go mod tidy
+
+  deps:tidy:
+    desc: Tidy dependencies
+    cmds:
+      - go mod tidy
+
+  deps:verify:
+    desc: Verify dependencies
+    cmds:
+      - go mod verify
+
+  # Development tools
+  tools:install:
+    desc: Install development tools
+    cmds:
+      - echo "Installing development tools..."
+      - go install github.com/cosmtrek/air@latest
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+      - go install golang.org/x/tools/cmd/goimports@latest
+      - go install github.com/pressly/goose/v3/cmd/goose@latest
+      - echo "Development tools installed!"
+
+  # Database commands
+  db:console:
+    desc: Open PostgreSQL console
+    cmds:
+      - PGPASSWORD={{.DB_PASSWORD}} psql -h {{.DB_HOST}} -p {{.DB_PORT}} -U {{.DB_USER}} -d {{.DB_NAME}}
+
+  db:seed:
+    desc: Seed database with test data
+    cmds:
+      - ./scripts/seed.sh
+
+  db:reset:
+    desc: Reset database and run migrations
+    cmds:
+      - task: migrate:reset
+      - task: migrate:up
+      - task: db:seed
+
+  # All-in-one commands
+  all:
+    desc: Clean, build, and test
+    cmds:
+      - task: clean
+      - task: build
+      - task: test
+
+  setup:
+    desc: Setup project (install tools, download deps, run migrations)
+    cmds:
+      - task: tools:install
+      - task: deps
+      - task: migrate:install
+      - echo "Project setup complete!"
+
+  start:
+    desc: Start everything (Docker + migrations)
+    cmds:
+      - task: docker:up
+      - sleep 5
+      - task: migrate:up
+      - echo "All services started!"
+      - echo ""
+      - echo "PostgreSQL - localhost:5433"
+      - echo "Redis - localhost:6380"
+      - echo "IAM Service - localhost:8080"
+
+  stop:
+    desc: Stop all services
+    cmds:
+      - task: docker:down
+
+  restart:
+    desc: Restart all services
+    cmds:
+      - task: stop
+      - task: start
+
+  # CI/CD commands
+  ci:
+    desc: Run CI pipeline (fmt, lint, test)
+    cmds:
+      - task: fmt
+      - task: lint
+      - task: test
+
+  # Generate commands
+  gen:mocks:
+    desc: Generate mocks for testing
+    cmds:
+      - echo "Generating mocks..."
+      - go generate ./...
+
+  # Security
+  security:check:
+    desc: Run security checks
+    cmds:
+      - echo "Running security checks..."
+      - go list -json -m all | nancy sleuth
+
+  # Documentation
+  docs:serve:
+    desc: Serve documentation (godoc)
+    cmds:
+      - echo "Starting godoc server on http://localhost:6060"
+      - godoc -http=:6060

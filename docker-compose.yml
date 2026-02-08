@@ -1,0 +1,227 @@
+version: "3.9"
+
+services:
+  # TRAEFIK - API Gateway
+  traefik:
+    image: traefik:v3.0
+    container_name: urls_traefik
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+      - "8081:8080"  # Dashboard
+    volumes:
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    networks:
+      - urls-network
+    depends_on:
+      - frontend
+      - urls-service
+      - iam-service
+
+  # FRONTEND - React App
+  frontend:
+    container_name: urls_frontend
+    build:
+      context: ./URLSFrontend
+      target: development
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./URLSFrontend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=
+    networks:
+      - urls-network
+
+  # URLS SERVICE - URL Shortener API
+  urls-service:
+    container_name: urls_service
+    build:
+      context: ./URLSService
+      dockerfile: docker/Dockerfile
+    restart: unless-stopped
+    environment:
+      # PostgreSQL
+      POSTGRES_HOST: urls-postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${URLS_POSTGRES_USER:-urlshortener}
+      POSTGRES_PASSWORD: ${URLS_POSTGRES_PASSWORD:-urlshortener_password}
+      POSTGRES_DB: ${URLS_POSTGRES_DB:-urlshortener_db}
+      # Redis
+      REDIS_HOST: urls-redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${URLS_REDIS_PASSWORD:-urls_redis_password}
+      REDIS_DB: "0"
+      # Application
+      APP_PORT: "9091"
+      APP_ENV: ${APP_ENV:-development}
+      CACHE_ENABLED: "true"
+      CACHE_TTL_MINUTES: "5"
+    depends_on:
+      urls-postgres:
+        condition: service_healthy
+      urls-redis:
+        condition: service_healthy
+    networks:
+      - urls-network
+
+  # IAM SERVICE - Identity & Access Management
+  iam-service:
+    container_name: urls_iam_service
+    build:
+      context: ./urls_iam_service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      # Application
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # HTTP Server
+      HTTP_PORT: "9092"
+      HTTP_READ_TIMEOUT: "10s"
+      HTTP_WRITE_TIMEOUT: "10s"
+      HTTP_IDLE_TIMEOUT: "60s"
+      # PostgreSQL
+      POSTGRES_HOST: iam-postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${IAM_POSTGRES_USER:-iam_user}
+      POSTGRES_PASSWORD: ${IAM_POSTGRES_PASSWORD:-iam_password}
+      POSTGRES_DB: ${IAM_POSTGRES_DB:-iam_db}
+      POSTGRES_SSL_MODE: disable
+      POSTGRES_MAX_CONNS: "25"
+      POSTGRES_MIN_CONNS: "5"
+      POSTGRES_MAX_CONN_LIFETIME: "1h"
+      POSTGRES_MAX_CONN_IDLE_TIME: "30m"
+      # Redis
+      REDIS_HOST: iam-redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${IAM_REDIS_PASSWORD:-iam_redis_password}
+      REDIS_DB: "0"
+      REDIS_POOL_SIZE: "10"
+      # Session
+      SESSION_TTL: ${SESSION_TTL:-720h}
+      SESSION_ID_LENGTH: ${SESSION_ID_LENGTH:-32}
+      SESSION_CACHE_TTL: ${SESSION_CACHE_TTL:-30s}
+      # Cookie
+      COOKIE_NAME: session_id
+      COOKIE_SECURE: "false"
+      COOKIE_HTTP_ONLY: "true"
+      COOKIE_SAME_SITE: Lax
+      COOKIE_DOMAIN: ""
+      COOKIE_PATH: "/"
+    depends_on:
+      iam-postgres:
+        condition: service_healthy
+      iam-redis:
+        condition: service_healthy
+    networks:
+      - urls-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9092/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # URLS SERVICE DATABASES
+  urls-postgres:
+    image: postgres:16-alpine
+    container_name: urls_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${URLS_POSTGRES_USER:-urlshortener}
+      POSTGRES_PASSWORD: ${URLS_POSTGRES_PASSWORD:-urlshortener_password}
+      POSTGRES_DB: ${URLS_POSTGRES_DB:-urlshortener_db}
+    volumes:
+      - urls_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${URLS_POSTGRES_USER:-urlshortener}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - urls-network
+
+  urls-redis:
+    image: redis:7.4-alpine
+    container_name: urls_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --requirepass ${URLS_REDIS_PASSWORD:-urls_redis_password}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+    volumes:
+      - urls_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${URLS_REDIS_PASSWORD:-urls_redis_password}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - urls-network
+
+  # IAM SERVICE DATABASES
+  iam-postgres:
+    image: postgres:16-alpine
+    container_name: iam_postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: ${IAM_POSTGRES_USER:-iam_user}
+      POSTGRES_PASSWORD: ${IAM_POSTGRES_PASSWORD:-iam_password}
+      POSTGRES_DB: ${IAM_POSTGRES_DB:-iam_db}
+    volumes:
+      - iam_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${IAM_POSTGRES_USER:-iam_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - urls-network
+
+  iam-redis:
+    image: redis:7.4-alpine
+    container_name: iam_redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    command: >
+      redis-server
+      --requirepass ${IAM_REDIS_PASSWORD:-iam_redis_password}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+    volumes:
+      - iam_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${IAM_REDIS_PASSWORD:-iam_redis_password}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - urls-network
+
+volumes:
+  urls_postgres_data:
+    driver: local
+  urls_redis_data:
+    driver: local
+  iam_postgres_data:
+    driver: local
+  iam_redis_data:
+    driver: local
+
+networks:
+  urls-network:
+    driver: bridge

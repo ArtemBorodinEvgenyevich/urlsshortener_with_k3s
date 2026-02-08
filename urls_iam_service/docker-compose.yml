@@ -1,0 +1,137 @@
+version: "3.9"
+
+services:
+  # PostgreSQL для IAM сервиса
+  postgres:
+    image: postgres:16-alpine
+    container_name: urls_iam_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${IAM_POSTGRES_USER:-iam_user}
+      POSTGRES_PASSWORD: ${IAM_POSTGRES_PASSWORD:-iam_secure_password}
+      POSTGRES_DB: ${IAM_POSTGRES_DB:-iam_db}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${IAM_POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - iam_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${IAM_POSTGRES_USER:-iam_user} -d ${IAM_POSTGRES_DB:-iam_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - urls-network
+
+  # Redis для session cache
+  redis:
+    image: redis:7.4-alpine
+    container_name: urls_iam_redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${IAM_REDIS_PASSWORD:-iam_redis_password}
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --appendonly yes
+      --appendfsync everysec
+    ports:
+      - "${IAM_REDIS_PORT:-6380}:6379"
+    volumes:
+      - iam_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${IAM_REDIS_PASSWORD:-iam_redis_password}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - urls-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # IAM Service
+  iam-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: urls_iam_service
+    restart: unless-stopped
+    ports:
+      - "${IAM_HTTP_PORT:-9092}:9092"
+    environment:
+      # Application
+      APP_ENV: ${APP_ENV:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+      # HTTP Server
+      HTTP_PORT: "9092"
+      HTTP_READ_TIMEOUT: "10s"
+      HTTP_WRITE_TIMEOUT: "10s"
+      HTTP_IDLE_TIMEOUT: "60s"
+
+      # PostgreSQL
+      POSTGRES_HOST: urls_iam_postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${IAM_POSTGRES_USER:-iam_user}
+      POSTGRES_PASSWORD: ${IAM_POSTGRES_PASSWORD:-iam_secure_password}
+      POSTGRES_DB: ${IAM_POSTGRES_DB:-iam_db}
+      POSTGRES_SSL_MODE: disable
+      POSTGRES_MAX_CONNS: "25"
+      POSTGRES_MIN_CONNS: "5"
+      POSTGRES_MAX_CONN_LIFETIME: "1h"
+      POSTGRES_MAX_CONN_IDLE_TIME: "30m"
+
+      # Redis
+      REDIS_HOST: urls_iam_redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${IAM_REDIS_PASSWORD:-iam_redis_password}
+      REDIS_DB: "0"
+      REDIS_POOL_SIZE: "10"
+
+      # Session settings
+      SESSION_TTL: ${SESSION_TTL:-720h}
+      SESSION_ID_LENGTH: ${SESSION_ID_LENGTH:-32}
+      SESSION_CACHE_TTL: ${SESSION_CACHE_TTL:-30s}
+
+      # Cookie
+      COOKIE_NAME: session_id
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      COOKIE_HTTP_ONLY: "true"
+      COOKIE_SAME_SITE: Lax
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+      COOKIE_PATH: "/"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - urls-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://localhost:9092/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  iam_postgres_data:
+    driver: local
+  iam_redis_data:
+    driver: local
+
+networks:
+  urls-network:
+    external: true

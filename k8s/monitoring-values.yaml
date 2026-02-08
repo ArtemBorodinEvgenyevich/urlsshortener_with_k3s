@@ -1,0 +1,26 @@
+grafana:
+  service:
+    type: NodePort
+    nodePort: 30300
+
+prometheus:
+  service:
+    type: NodePort
+    nodePort: 30090
+  prometheusSpec:
+    additionalScrapeConfigs:
+      - job_name: 'vm2-node'
+        static_configs:
+          - targets: ['192.168.57.21:9100']
+            labels:
+              instance: 'db-node'
+      - job_name: 'vm2-postgres'
+        static_configs:
+          - targets: ['192.168.57.21:9187']
+            labels:
+              instance: 'db-node'
+      - job_name: 'vm2-redis'
+        static_configs:
+          - targets: ['192.168.57.21:9121']
+            labels:
+              instance: 'db-node'

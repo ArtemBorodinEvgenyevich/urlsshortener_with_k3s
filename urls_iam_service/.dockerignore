@@ -1,0 +1,65 @@
+ # Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Build artifacts
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+urlshortener
+
+# Test files
+*_test.go
+testdata/
+coverage.out
+coverage.html
+
+# Development files
+.env
+.env.*
+!.env.example
+
+# Docker files (not needed in image)
+docker/
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+README.md
+CHANGELOG.md
+LICENSE
+*.md
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Taskfile
+Taskfile.yml
+Makefile
+
+# Logs and temp files
+*.log
+*.tmp
+*.pid
+logs/
+tmp/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Go specific
+vendor/

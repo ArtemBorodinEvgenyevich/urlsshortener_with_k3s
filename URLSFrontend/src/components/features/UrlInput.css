@@ -1,0 +1,119 @@
+.url-input-container {
+    width: 100%;
+}
+
+.url-input-form {
+    width: 100%;
+}
+
+.url-input-form .pure-g > div {
+    padding: 0.5rem;
+}
+
+.input-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.url-input {
+    padding: 1rem 1.25rem !important;
+    font-size: 1rem !important;
+    border: 2px solid #e0e0e0 !important;
+    border-radius: 12px !important;
+    outline: none;
+    transition: all 0.3s ease;
+    font-family: inherit;
+    background-color: #ffffff;
+    box-sizing: border-box;
+}
+
+.url-input::placeholder {
+    color: #9ca3af;
+}
+
+.url-input:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+.url-input.valid {
+    border-color: #10b981 !important;
+}
+
+.url-input.valid:focus {
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1) !important;
+}
+
+.url-input.error {
+    border-color: #ef4444 !important;
+}
+
+.url-input.error:focus {
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+}
+
+.url-input:disabled {
+    background-color: #f3f4f6 !important;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.error-message {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: #ef4444;
+    font-weight: 500;
+    text-align: left;
+}
+
+.submit-button {
+    width: 100%;
+    padding: 1rem 2rem !important;
+    font-size: 1rem !important;
+    font-weight: 600 !important;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+    border: none !important;
+    border-radius: 12px !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 52px;
+    box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2);
+    transition: all 0.3s ease;
+    color: #ffffff !important;
+}
+
+.submit-button:hover:not(:disabled) {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(59, 130, 246, 0.3);
+}
+
+.submit-button:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.submit-button:disabled {
+    background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%) !important;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+    opacity: 0.6;
+}
+
+.spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

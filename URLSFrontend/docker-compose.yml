@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # Development сервис
+  # ==========================================
+  frontend-dev:
+    container_name: urls-frontend-dev
+    build:
+      context: .
+      target: development
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      # Монтируем код для hot reload
+      - .:/app
+      # Исключаем node_modules (используем из контейнера)
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      # URL бэкенда (можно переопределить)
+      - VITE_API_URL=http://localhost:9091
+    networks:
+      - urls-network
+    # Автоматический перезапуск
+    restart: unless-stopped
+
+  # ==========================================
+  # Production сервис
+  # ==========================================
+  frontend-prod:
+    container_name: urls-frontend-prod
+    build:
+      context: .
+      target: production
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - urls-network
+    restart: unless-stopped
+
+networks:
+  urls-network:
+    external: true
