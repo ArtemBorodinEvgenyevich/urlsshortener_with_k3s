@@ -1,0 +1,20 @@
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: url-shortener-images
+  namespace: argocd
+spec:
+  namespace: argocd
+  applicationRefs:
+    - namePattern: "url-shortener"
+      images:
+        - alias: frontend
+          imageName: ghcr.io/artemborodinevgenyevich/urls-frontend:latest
+        - alias: urls-service
+          imageName: ghcr.io/artemborodinevgenyevich/urls-service:latest
+        - alias: iam-service
+          imageName: ghcr.io/artemborodinevgenyevich/iam-service:latest
+        - alias: urls-migration
+          imageName: ghcr.io/artemborodinevgenyevich/urls-migration:latest
+        - alias: iam-migration
+          imageName: ghcr.io/artemborodinevgenyevich/iam-migration:latest

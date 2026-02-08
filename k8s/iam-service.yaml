@@ -15,8 +15,7 @@ spec:
     spec:
       initContainers:
         - name: migrate
-          image: iam-migration:latest
-          imagePullPolicy: Never
+          image: ghcr.io/artemborodinevgenyevich/iam-migration:latest
           command: ["goose", "-dir", "/migrations", "postgres",
             "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable",
             "up"]
@@ -36,8 +35,7 @@ spec:
                   key: POSTGRES_PASSWORD
       containers:
         - name: iam-service
-          image: iam-service:latest
-          imagePullPolicy: Never
+          image: ghcr.io/artemborodinevgenyevich/iam-service:latest
           ports:
             - containerPort: 9092
           env:

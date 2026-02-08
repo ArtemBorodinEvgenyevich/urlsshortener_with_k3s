@@ -15,8 +15,7 @@ spec:
     spec:
       containers:
         - name: urls-frontend
-          image: urls-frontend:latest
-          imagePullPolicy: Never
+          image: ghcr.io/artemborodinevgenyevich/urls-frontend:latest
           ports:
             - containerPort: 80
 ---

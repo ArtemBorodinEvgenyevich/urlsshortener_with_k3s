@@ -15,8 +15,7 @@ spec:
     spec:
       initContainers:
         - name: migrate
-          image: urls-migration:latest
-          imagePullPolicy: Never
+          image: ghcr.io/artemborodinevgenyevich/urls-migration:latest
           command: ["goose", "-dir", "/migrations", "postgres",
             "postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)?sslmode=disable",
             "up"]
@@ -36,8 +35,7 @@ spec:
                   key: POSTGRES_PASSWORD
       containers:
         - name: urls-service
-          image: urls-service:latest
-          imagePullPolicy: Never
+          image: ghcr.io/artemborodinevgenyevich/urls-service:latest
           ports:
             - containerPort: 9091
           env:
