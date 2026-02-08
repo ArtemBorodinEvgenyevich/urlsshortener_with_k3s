@@ -1,0 +1,152 @@
+name: Build and push images
+on:
+  push:
+    branches: [master]
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: artemborodinevgenyevich
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-22.04
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      urls-service: ${{ steps.filter.outputs.urls-service }}
+      iam-service: ${{ steps.filter.outputs.iam-service }}
+      urls-migrations: ${{ steps.filter.outputs.urls-migrations }}
+      iam-migrations: ${{ steps.filter.outputs.iam-migrations }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'URLSFrontend/**'
+            urls-service:
+              - 'URLSService/**'
+            iam-service:
+              - 'urls_iam_service/**'
+            urls-migrations:
+              - 'URLSService/db/migrations/**'
+            iam-migrations:
+              - 'urls_iam_service/migrations/**'
+
+  build-frontend:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: URLSFrontend
+          file: URLSFrontend/Dockerfile
+          target: runtime
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/urls-frontend:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/urls-frontend:latest
+
+  build-urls-service:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.urls-service == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: URLSService
+          file: URLSService/docker/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/urls-service:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/urls-service:latest
+            
+  build-iam-service:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.iam-service == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: urls_iam_service
+          file: urls_iam_service/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/iam-service:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/iam-service:latest
+
+  build-urls-migration:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.urls-migrations == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: URLSService
+          file: k8s/Dockerfile.migrations
+          build-args: MIGRATIONS_PATH=db/migrations
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/urls-migration:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/urls-migration:latest
+
+  build-iam-migration:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.iam-migrations == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: urls_iam_service
+          file: k8s/Dockerfile.migrations
+          build-args: MIGRATIONS_PATH=migrations
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/iam-migration:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/iam-migration:latest
