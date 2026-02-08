@@ -2,6 +2,7 @@ name: Build and push images
 on:
   push:
     branches: [master]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -35,7 +36,7 @@ jobs:
 
   build-frontend:
     needs: detect-changes
-    if: needs.detect-changes.outputs.frontend == 'true'
+    if: needs.detect-changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-22.04
     permissions:
       contents: read
@@ -59,7 +60,7 @@ jobs:
 
   build-urls-service:
     needs: detect-changes
-    if: needs.detect-changes.outputs.urls-service == 'true'
+    if: needs.detect-changes.outputs.urls-service == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -82,7 +83,7 @@ jobs:
             
   build-iam-service:
     needs: detect-changes
-    if: needs.detect-changes.outputs.iam-service == 'true'
+    if: needs.detect-changes.outputs.iam-service == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -105,7 +106,7 @@ jobs:
 
   build-urls-migration:
     needs: detect-changes
-    if: needs.detect-changes.outputs.urls-migrations == 'true'
+    if: needs.detect-changes.outputs.urls-migrations == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -129,7 +130,7 @@ jobs:
 
   build-iam-migration:
     needs: detect-changes
-    if: needs.detect-changes.outputs.iam-migrations == 'true'
+    if: needs.detect-changes.outputs.iam-migrations == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
