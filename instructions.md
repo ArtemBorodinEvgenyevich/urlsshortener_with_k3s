@@ -412,6 +412,113 @@ Scrape-конфиг уже включён в `k8s/monitoring-values.yaml`.
 
 ---
 
+## Фаза 7 — CI/CD (GitHub Actions + ArgoCD)
+
+### GitHub Actions
+
+Workflow файл: `.github/workflows/build-and-push.yaml`
+
+При push в `master`:
+1. `detect-changes` — определяет какие сервисы изменились (по путям файлов)
+2. Для каждого изменённого сервиса — собирает Docker-образ и пушит в ghcr.io
+3. Образы получают теги: `:latest` и `:SHA-коммита`
+
+Для ручного запуска (все образы) добавлен триггер `workflow_dispatch`:
+GitHub → Actions → Build and Push Images → Run workflow.
+
+Registry: `ghcr.io/artemborodinevgenyevich/`
+
+### ArgoCD
+
+Установка:
+
+```bash
+kubectl create namespace argocd
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+```
+
+> На VM1 может потребоваться импорт образа Redis если `public.ecr.aws` недоступен:
+> ```bash
+> sudo k3s ctr images pull docker.io/library/redis:8.2.3-alpine
+> sudo k3s ctr images tag docker.io/library/redis:8.2.3-alpine public.ecr.aws/docker/library/redis:8.2.3-alpine
+> ```
+
+Открыть UI:
+
+```bash
+kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "NodePort", "ports": [{"port": 443, "nodePort": 30443}]}}'
+```
+
+Получить пароль:
+
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+```
+
+ArgoCD UI: `https://192.168.57.20:30443` (логин `admin`)
+
+Если repo-server падает с liveness probe timeout (VirtualBox NAT медленно проксирует HTTPS, git-операции к GitHub могут занимать 15+ секунд):
+
+```bash
+# Увеличить таймауты probe и git-запросов
+kubectl patch deployment argocd-repo-server -n argocd --type=json -p='[
+  {"op": "replace", "path": "/spec/template/spec/containers/0/livenessProbe/timeoutSeconds", "value": 30},
+  {"op": "replace", "path": "/spec/template/spec/containers/0/livenessProbe/periodSeconds", "value": 60},
+  {"op": "replace", "path": "/spec/template/spec/containers/0/livenessProbe/failureThreshold", "value": 5},
+  {"op": "replace", "path": "/spec/template/spec/containers/0/readinessProbe/timeoutSeconds", "value": 30},
+  {"op": "replace", "path": "/spec/template/spec/containers/0/readinessProbe/periodSeconds", "value": 30}
+]'
+
+kubectl patch configmap argocd-cmd-params-cm -n argocd --type merge -p '{"data":{"reposerver.git.request.timeout":"60"}}'
+```
+
+### ArgoCD Application
+
+Применяется вручную (один раз):
+
+```bash
+kubectl apply -f k8s/argocd-app.yaml
+```
+
+ArgoCD следит за папкой `k8s/` в репозитории. Используется Kustomize — `k8s/kustomization.yaml` перечисляет ресурсы и управляет image-тегами.
+
+### ArgoCD Image Updater
+
+Установка:
+
+```bash
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/stable/config/install.yaml
+```
+
+Конфигурация через CRD:
+
+```bash
+kubectl apply -f k8s/image-updater.yaml
+```
+
+Image Updater каждые 2 минуты проверяет ghcr.io на наличие новых образов и автоматически обновляет деплойменты.
+
+### Полный цикл деплоя
+
+```
+git push → GitHub Actions → сборка образов → push в ghcr.io
+                                                    ↓
+         ArgoCD ← следит за k8s/ в Git ← синхронизирует манифесты
+                                                    ↓
+         Image Updater ← следит за ghcr.io ← обновляет деплойменты
+```
+
+### Доступы к UI
+
+| Сервис | URL | Логин |
+|--------|-----|-------|
+| Приложение | `http://192.168.57.20` | — |
+| Grafana | `http://192.168.57.20:30300` | admin / prom-operator |
+| Prometheus | `http://192.168.57.20:30090` | — |
+| ArgoCD | `https://192.168.57.20:30443` | admin / (из secret) |
+
+---
+
 ## Полезные команды
 
 ```bash
