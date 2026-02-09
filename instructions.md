@@ -284,7 +284,7 @@ k8s/
 ├── frontend.yaml           # Frontend Deployment + Service
 ├── urls-service.yaml       # URLSService Deployment + Service (с init container для миграций)
 ├── iam-service.yaml        # IAM Service Deployment + Service (с init container для миграций)
-├── ingress.yaml            # Traefik Ingress (маршрутизация)
+├── ingress.yaml            # Traefik IngressRoute + ForwardAuth Middleware (маршрутизация + авторизация)
 └── Dockerfile.migrations   # Dockerfile для сборки migration-образов
 ```
 
@@ -317,13 +317,22 @@ kubectl logs -n urls -l app=iam-service
 kubectl get ingress -n urls
 ```
 
-### Маршрутизация Ingress
+### Маршрутизация (Traefik IngressRoute)
 
-| Path | Сервис | Порт |
-|------|--------|------|
-| `/api/v1` | urls-service | 9091 |
-| `/auth` | iam-service | 9092 |
-| `/` | urls-frontend | 80 |
+Используются Traefik CRD вместо стандартного Ingress — для поддержки ForwardAuth middleware (авторизация через IAM-сервис, как в Docker-конфигурации).
+
+`ingress.yaml` содержит:
+- **Middleware `auth-required`** — ForwardAuth, вызывает `iam-service:9092/auth/validate`, пробрасывает заголовки `X-User-Id` и `X-Provider`
+- **IngressRoute** — маршруты с приоритетами
+
+| Приоритет | Match | Middleware | Сервис |
+|-----------|-------|------------|--------|
+| 20 | `/api/v1/health`, `/api/v1/readiness` | — | urls-service:9091 |
+| 15 | `/auth/*`, `/users/*` | — | iam-service:9092 |
+| 12 | `GET /api/v1/urls` | auth-required | urls-service:9091 |
+| 11 | `POST/DELETE/PUT/PATCH /api/*` | auth-required | urls-service:9091 |
+| 10 | `GET /api/*` | — | urls-service:9091 |
+| 1 | `/*` | — | urls-frontend:80 |
 
 Приложение доступно по адресу: `http://192.168.57.20`
 
@@ -409,6 +418,20 @@ Scrape-конфиг уже включён в `k8s/monitoring-values.yaml`.
 | 11835 | Redis Dashboard | Память, команды, ключи |
 
 При импорте выбрать Prometheus как data source.
+
+---
+
+## Фаза 6.5 — Traefik Dashboard
+
+k3s использует встроенный Traefik. Для включения дашборда:
+
+```bash
+kubectl apply -f k8s/traefik-dashboard.yaml
+```
+
+Манифест содержит HelmChartConfig (включает `--api.insecure=true`) и NodePort-сервис (порт 30888). Ресурсы в `kube-system` — не управляются ArgoCD.
+
+Traefik Dashboard: `http://192.168.57.20:30888/dashboard/` (слеш в конце обязателен)
 
 ---
 
@@ -513,6 +536,7 @@ git push → GitHub Actions → сборка образов → push в ghcr.io
 | Сервис | URL | Логин |
 |--------|-----|-------|
 | Приложение | `http://192.168.57.20` | — |
+| Traefik Dashboard | `http://192.168.57.20:30888/dashboard/` | — |
 | Grafana | `http://192.168.57.20:30300` | admin / prom-operator |
 | Prometheus | `http://192.168.57.20:30090` | — |
 | ArgoCD | `https://192.168.57.20:30443` | admin / (из secret) |
