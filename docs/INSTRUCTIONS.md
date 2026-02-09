@@ -1,40 +1,6 @@
 # URL Shortener — Infrastructure Setup Guide
 
-Инструкция по развёртыванию url_shortener на VirtualBox с k3s.
-
-## Архитектура
-
-```
-┌──────────────────────────────────────────────────┐
-│  VM1 (192.168.57.20) — k3s server               │
-│  ┌────────────┐ ┌────────────┐ ┌──────────────┐ │
-│  │URLSService │ │IAM Service │ │  Frontend    │ │
-│  │  :9091     │ │  :9092     │ │  nginx :80   │ │
-│  └────────────┘ └────────────┘ └──────────────┘ │
-│  ┌────────────────────────────────────────────┐  │
-│  │  Traefik Ingress (встроен в k3s) :80/:443 │  │
-│  └────────────────────────────────────────────┘  │
-└────────────────────┬─────────────────────────────┘
-                     │ 192.168.57.0/24
-┌────────────────────┴─────────────────────────────┐
-│  VM2 (192.168.57.21) — Databases                 │
-│  ┌──────────────────┐  ┌───────────────────────┐ │
-│  │ PostgreSQL 16    │  │ Redis 7               │ │
-│  │ :5432            │  │ :6379                 │ │
-│  │ - urlshortener_db│  │ - DB 0 (urls cache)   │ │
-│  │ - iam_db         │  │ - DB 1 (iam sessions) │ │
-│  └──────────────────┘  └───────────────────────┘ │
-└──────────────────────────────────────────────────┘
-```
-
-## Предварительные требования
-
-- VirtualBox 7+
-- Ubuntu Server 22.04 ISO
-- Docker на хост-машине (для сборки образов)
-- kubectl на хост-машине
-
----
+### Инструкция по развёртыванию url_shortener на VirtualBox с k3s.
 
 ## Фаза 0 — Настройка сети VirtualBox
 
@@ -43,6 +9,12 @@
 VirtualBox → Tools → Networks → Host-only Networks:
 
 - **vboxnet1**: IPv4 Prefix `192.168.57.1/24`, DHCP Server — Disabled
+
+> Дефолтный vboxnet0 необходимо оставить
+> 
+> Если его нет то создать со следующими параметрами:
+> 
+> `name: vboxnet0, ipv4: 192.168.56.1/24, DHCP: enabled`
 
 > VirtualBox может сбрасывать IP при перезапуске. Если это произошло, зафиксировать через CLI:
 > ```bash
@@ -70,8 +42,16 @@ ip addr show vboxnet1
 ### Установка Ubuntu Server 22.04
 
 При установке:
-- Network: enp0s3 — DHCP, enp0s8 — static `192.168.57.20/24`
+- Network:
+  - enp0s3 — DHCP (оставить по умолчанию),
+  - enp0s8 — static `192.168.57.20/24` (Enter -> Edit IPV4 -> Manual -> Subnet: `192.168.57.0/24`, Address: `192.168.57.20`)
 - Отметить "Install OpenSSH Server"
+- Остальное можно оставить как есть
+
+Пример:
+
+
+![network](./network.png)
 
 ### Проверка после установки
 
@@ -93,9 +73,12 @@ ping google.com
 - Adapters: аналогично VM1
 
 ### Установка Ubuntu Server 22.04
-
-- Network: enp0s3 — DHCP, enp0s8 — static `192.168.57.21/24`
+Аналогично VM1
+- Network:
+  - enp0s3 — DHCP (оставить по умолчанию),
+  - enp0s8 — static `192.168.57.21/24` (Enter -> Edit IPV4 -> Manual -> Subnet: `192.168.57.0/24`, Address: `192.168.57.21/24`)
 - Отметить "Install OpenSSH Server"
+- Остальное можно оставить как есть
 
 ### PostgreSQL 16
 
@@ -179,11 +162,21 @@ redis-cli -h 192.168.57.21 -p 6379 ping   # → PONG
 
 ```bash
 # На VM1
-curl -sfL https://get.k3s.io | sh -
+curl -sfL `https://get.k3s.io` | sh -
 
 # Проверить
 sudo kubectl get nodes
 ```
+> Если не можем достучаться, то копируем c файл k3s_install_script.sh на vm1 через scp
+> ```bash
+> # С хоста
+> scp /path/to/script/dir/k3s_install_script.sh <user_name>@192.168.57.20:/home/<user_name>/
+> 
+> # На VM1
+> cd ~/
+> sudo chmod +x k3s_install_script.sh; sudo ./k3s_install_script.sh
+> ```
+ 
 
 ### TLS SAN для доступа с хоста
 
@@ -225,15 +218,6 @@ kubectl get nodes
 ---
 
 ## Фаза 4 — Сборка и загрузка Docker-образов
-
-### Установка Docker на VM1 (для импорта образов)
-
-```bash
-# На VM1
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-# Перелогиниться
-```
 
 ### Сборка образов (на хосте)
 
@@ -338,7 +322,7 @@ kubectl get ingress -n urls
 
 ---
 
-## Обновление сервисов
+## Обновление сервисов (на данном этапе)
 
 При изменении кода:
 
@@ -450,6 +434,7 @@ Workflow файл: `.github/workflows/build-and-push.yaml`
 GitHub → Actions → Build and Push Images → Run workflow.
 
 Registry: `ghcr.io/artemborodinevgenyevich/`
+> При форке заменить все упоминания registry, user, owner на свои
 
 ### ArgoCD
 
@@ -537,7 +522,7 @@ git push → GitHub Actions → сборка образов → push в ghcr.io
 |--------|-----|-------|
 | Приложение | `http://192.168.57.20` | — |
 | Traefik Dashboard | `http://192.168.57.20:30888/dashboard/` | — |
-| Grafana | `http://192.168.57.20:30300` | admin / prom-operator |
+| Grafana | `http://192.168.57.20:30300` | admin / (из secret) |
 | Prometheus | `http://192.168.57.20:30090` | — |
 | ArgoCD | `https://192.168.57.20:30443` | admin / (из secret) |
 
